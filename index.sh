@@ -16,11 +16,11 @@ _() {
     exit 1
   fi
 
-  # Clone the repo instead of creating a new one
   git clone "https://${TOKEN}@github.com/${USERNAME}/${REPO}.git" "$YEAR"
   cd "$YEAR" || exit 1
-
   [ -f journal.txt ] || touch journal.txt
+
+  git config commit.gpgsign false
 
   NOTES=(
     "Thought about modularizing config loader."
@@ -121,44 +121,40 @@ _() {
     "General maintenance."
   )
 
+  ALL_MESSAGES=(
+    "${NOTES[@]}"
+    "${BURNOUTS[@]}"
+    "${LEARNING[@]}"
+    "${EXPERIMENTS[@]}"
+    "${INFRA[@]}"
+    "${CLEANUP[@]}"
+    "${FRONTEND[@]}"
+    "${FUNNY[@]}"
+    "${CLEAR[@]}"
+  )
+
   for i in {0..364}; do
     DATE=$(date -d "$YEAR-01-01 +$i days" +%Y-%m-%d)
-
-    ALL_MESSAGES=(
-      "${NOTES[@]}"
-      "${BURNOUTS[@]}"
-      "${LEARNING[@]}"
-      "${EXPERIMENTS[@]}"
-      "${INFRA[@]}"
-      "${CLEANUP[@]}"
-      "${FRONTEND[@]}"
-      "${FUNNY[@]}"
-      "${CLEAR[@]}"
-    )
     INDEX=$((RANDOM % ${#ALL_MESSAGES[@]}))
     MESSAGE="${ALL_MESSAGES[$INDEX]}"
     LOG_ENTRY="$DATE: $MESSAGE"
 
-    # Prevent duplicates and sort all logs
-    if [ -f journal.txt ]; then
-      grep -v "^$DATE:" journal.txt > temp.txt
-      echo "$LOG_ENTRY" >> temp.txt
-      sort temp.txt > journal.txt
-      rm temp.txt
-    else
-      echo "$LOG_ENTRY" > journal.txt
-    fi
+    grep -v "^$DATE:" journal.txt > temp.txt
+    echo "$LOG_ENTRY" >> temp.txt
+    sort temp.txt > journal.txt
+    rm temp.txt
 
     git add journal.txt
 
     MONTH_DAY=$(date -d "$DATE" +"%b %d")
     GIT_AUTHOR_DATE="$DATE 12:00:00" \
     GIT_COMMITTER_DATE="$DATE 12:00:00" \
-    git commit -m "$MONTH_DAY: $MESSAGE"
+    git commit -m "$MONTH_DAY: $MESSAGE" --no-gpg-sign > /dev/null
   done
 
   git push -u origin main
+
   echo
-  echo "Done. Check your graph at: https://github.com/${USERNAME}"
+  echo "✅ Done. Check your graph at: https://github.com/${USERNAME}"
 } && _
 unset -f _
