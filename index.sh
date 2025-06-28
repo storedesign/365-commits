@@ -16,11 +16,9 @@ _() {
     exit 1
   fi
 
-  git clone "https://${TOKEN}@github.com/${USERNAME}/${REPO}.git" "$YEAR"
-  cd "$YEAR" || exit 1
-  [ -f journal.txt ] || touch journal.txt
-
-  git config commit.gpgsign false
+  mkdir "$YEAR" && cd "$YEAR" || exit 1
+  git init
+  touch journal.txt
 
   NOTES=(
     "Thought about modularizing config loader."
@@ -121,6 +119,7 @@ _() {
     "General maintenance."
   )
 
+  # Combine all messages into one array
   ALL_MESSAGES=(
     "${NOTES[@]}"
     "${BURNOUTS[@]}"
@@ -133,27 +132,39 @@ _() {
     "${CLEAR[@]}"
   )
 
+  # Generate log entries
+  LOG_LINES=()
   for i in {0..364}; do
     DATE=$(date -d "$YEAR-01-01 +$i days" +%Y-%m-%d)
     INDEX=$((RANDOM % ${#ALL_MESSAGES[@]}))
     MESSAGE="${ALL_MESSAGES[$INDEX]}"
-    LOG_ENTRY="$DATE: $MESSAGE"
-
-    grep -v "^$DATE:" journal.txt > temp.txt
-    echo "$LOG_ENTRY" >> temp.txt
-    sort temp.txt > journal.txt
-    rm temp.txt
-
-    git add journal.txt
-
-    MONTH_DAY=$(date -d "$DATE" +"%b %d")
-    GIT_AUTHOR_DATE="$DATE 12:00:00" \
-    GIT_COMMITTER_DATE="$DATE 12:00:00" \
-    git commit -m "$MONTH_DAY: $MESSAGE" --no-gpg-sign > /dev/null
+    LOG_LINES+=("$DATE: $MESSAGE")
   done
 
+  # Add log entries to journal.txt once
+  for ENTRY in "${LOG_LINES[@]}"; do
+    echo "$ENTRY"
+  done >> journal.txt
+
+  # Sort and deduplicate once
+  sort -u journal.txt -o journal.txt
+
+  # Commit each entry with correct date
+  for ENTRY in "${LOG_LINES[@]}"; do
+    DATE=$(cut -d ':' -f1 <<< "$ENTRY")
+    MESSAGE=$(cut -d ':' -f2- <<< "$ENTRY")
+    git add journal.txt
+    GIT_AUTHOR_DATE="$DATE 12:00:00" \
+    GIT_COMMITTER_DATE="$DATE 12:00:00" \
+    git commit -m "$DATE: $MESSAGE" --no-gpg-sign > /dev/null
+  done
+
+  git branch -M main
+  git remote add origin "https://${TOKEN}@github.com/${USERNAME}/${REPO}.git"
   git push -u origin main
 
+  cd ..
+  rm -rf "$YEAR"
   echo
   echo "✅ Done. Check your graph at: https://github.com/${USERNAME}"
 } && _
