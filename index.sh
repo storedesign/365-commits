@@ -11,7 +11,10 @@ _() {
   read -r REPO
   echo "Year to fake commits for (e.g. 2000):"
   read -r YEAR
-  if [ -z "$USERNAME" ] || [ -z "$TOKEN" ] || [ -z "$REPO" ] || [ -z "$YEAR" ]; then
+  echo "Number of commits to generate (e.g. 100):"
+  read -r NUM_COMMITS
+  
+  if [ -z "$USERNAME" ] || [ -z "$TOKEN" ] || [ -z "$REPO" ] || [ -z "$YEAR" ] || [ -z "$NUM_COMMITS" ]; then
     echo "All fields are required."
     exit 1
   fi
@@ -37,7 +40,7 @@ _() {
   LEARNING=(
     "Read 3 docs. Still confused."
     "Finally understood something from last week."
-    "Watched a tutorial. Didn’t follow it exactly."
+    "Watched a tutorial. Didn't follow it exactly."
     "Learning async the hard way."
     "Turns out I misunderstood Promises all this time."
     "Tried something from a blog. Kinda works."
@@ -60,11 +63,11 @@ _() {
   )
   INFRA=(
     "Tweaked the CI again. Hope it works now."
-    "YAML gods weren’t kind today."
+    "YAML gods weren't kind today."
     "Added a dotfile. Feeling powerful."
     "Updated .env.example like a responsible dev."
     "Renamed scripts. It was chaos before."
-    "Docker did a thing. I don’t understand it yet."
+    "Docker did a thing. I don't understand it yet."
     "Cleaned up the scripts folder. Was a mess."
     "CI now yells less at me."
     "Refreshed some Makefile voodoo."
@@ -102,7 +105,7 @@ _() {
     "This is fine. Everything is fine."
     "Fixed one bug, created three."
     "Built with vibes only."
-    "Code works. Don’t touch it."
+    "Code works. Don't touch it."
     "It's not a bug, it's a feature."
     "Cowboy coding at its finest."
   )
@@ -132,31 +135,30 @@ _() {
     "${CLEAR[@]}"
   )
 
-  # Generate log entries
-  LOG_LINES=()
-  for i in {0..364}; do
-    DATE=$(date -d "$YEAR-01-01 +$i days" +%Y-%m-%d)
-    INDEX=$((RANDOM % ${#ALL_MESSAGES[@]}))
-    MESSAGE="${ALL_MESSAGES[$INDEX]}"
-    LOG_LINES+=("$DATE: $MESSAGE")
-  done
-
-  # Add log entries to journal.txt once
-  for ENTRY in "${LOG_LINES[@]}"; do
-    echo "$ENTRY"
-  done >> journal.txt
-
-  # Sort and deduplicate once
-  sort -u journal.txt -o journal.txt
-
-  # Commit each entry with correct date
-  for ENTRY in "${LOG_LINES[@]}"; do
-    DATE=$(cut -d ':' -f1 <<< "$ENTRY")
-    MESSAGE=$(cut -d ':' -f2- <<< "$ENTRY")
+  # Generate random commits all at once
+  for ((i=1; i<=NUM_COMMITS; i++)); do
+    # Generate random day of the year (1-365)
+    RANDOM_DAY=$((RANDOM % 365 + 1))
+    DATE=$(date -d "$YEAR-01-01 +$((RANDOM_DAY - 1)) days" +%Y-%m-%d)
+    
+    # Random message
+    MESSAGE_INDEX=$((RANDOM % ${#ALL_MESSAGES[@]}))
+    MESSAGE="${ALL_MESSAGES[$MESSAGE_INDEX]}"
+    
+    # Random hour (9-23 for realistic commit times)
+    HOUR=$((RANDOM % 15 + 9))
+    MINUTE=$((RANDOM % 60))
+    TIME="$HOUR:$(printf "%02d" $MINUTE):00"
+    
+    # Add random content to make each commit unique
+    echo "$DATE $TIME: $MESSAGE" >> journal.txt
+    
     git add journal.txt
-    GIT_AUTHOR_DATE="$DATE 12:00:00" \
-    GIT_COMMITTER_DATE="$DATE 12:00:00" \
-    git commit -m "$DATE: $MESSAGE" --no-gpg-sign > /dev/null
+    GIT_AUTHOR_DATE="$DATE $TIME" \
+    GIT_COMMITTER_DATE="$DATE $TIME" \
+    git commit -m "$MESSAGE" --no-gpg-sign > /dev/null
+    
+    echo "Generated commit $i/$NUM_COMMITS: $DATE - $MESSAGE"
   done
 
   git branch -M main
@@ -166,6 +168,7 @@ _() {
   cd ..
   rm -rf "$YEAR"
   echo
-  echo "✅ Done. Check your graph at: https://github.com/${USERNAME}"
+  echo "✅ Done! Generated $NUM_COMMITS random commits for $YEAR"
+  echo "Check your graph at: https://github.com/${USERNAME}"
 } && _
 unset -f _
